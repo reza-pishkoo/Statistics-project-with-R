@@ -1,0 +1,390 @@
+---
+title: "R_phase2"
+author: "Reza Pishkoo"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(lemon) #to print dfs in a pretty way
+
+knit_print.data.frame <- lemon_print
+
+```
+
+
+#part A
+
+```{r}
+library(readxl)
+
+input = read.csv("data/lyon_housing.csv")
+
+input$date_transaction = as.Date(input$date_transaction)
+input$type_purchase = as.factor(input$type_purchase)
+input$type_property = as.factor(input$type_property)
+input$date_construction = as.Date(input$date_construction)
+input$district = as.factor(input$district)
+input$latitude = as.double(input$latitude)
+input$longitude = as.double(input$longitude)
+```
+<div dir="auto">
+در این cell ستون های با فرمت کاراکتر را فاکتور کردم و ستون های اعشاری را دابل کردم و ستون های به فرمت تاریخ هم Date کردم که در ادامه استفاده کنم.
+</div>
+
+
+```{r, render = lemon_print}
+summary(input)
+
+```
+
+<div dir="auto">
+در این سامری تعداد NA های ستون های surface_effective_usable, latitude, longitude قابل مشاهده است و همچنین میانگین و ماکسیمم و مینیمم ستون های عددی بیان شده است. که در ادامه داده های معیوب ستون های latitudeو longitude را حذف میکنم.
+</div>
+
+
+```{r}
+deleteNA <- function(nans){
+  list_to_delete = vector()
+
+  for (i in 1:length(nans)){
+    if (nans[i]){
+      list_to_delete = c(list_to_delete, i)
+    }
+  }
+  return(list_to_delete)
+}
+
+l = deleteNA(is.na(input$latitude))
+
+input = input[-c(l), ]
+
+```
+<div dir="auto">
+در این cell اندیس سطر های معیوب ستون های latitude و longitude را پیدا میکنم که تعداد آنها 143 تا است و آنها را حذف میکنم.
+</div>
+
+
+```{r, render = lemon_print}
+summary(input)
+
+```
+<div dir="auto">
+در این سامری هم مشخص است که سطر های NA حذف شده اند.
+</div>
+
+```{r}
+library(ggplot2)
+
+ggplot() +geom_point( data=input, aes(y=latitude, x=longitude, color = district), size = 0.4)
+```
+<div dir="auto">
+در این cell مختصات خانه ها را با توجه به اینکه در چه منطقه ای هستند دسته بندی کردم و نقشه آن را نمایش داده ام. که همانطور که قابل پیشبینی بود خانه های منطقه های یکسان در یک ناحیه متراکم نزیدک به هم قرار دارند.
+</div>
+
+```{r}
+library(ggplot2)
+
+ggplot() +geom_point( data=input, aes(y=latitude, x=longitude, color = as.Date(date_construction)))
+```
+<div dir="auto">
+در این Cell خانه ها را بر حسب تاریخ ساخت دسته بندی کردم که همانطور که از نقشه میتوان فهمید خانه های قدیمی شهر در سمت بالا راست شهر تراکم زیادی دارند و میتوان گفت بافت قدیمی شهر آنجاست. و همچنین با مقایسه با نمودار بالا که منطقه ها را نشان میداد میتوان فهمید که منطقه Villeurbanne منطقه ای قدیمی است.
+</div>
+
+
+```{r}
+
+library("rjson")
+stations_json <- fromJSON(file = "data/station_coordinates.json")
+
+
+```
+
+
+```{r}
+station_vec = vector()
+latitudes_vec = vector()
+longitudes_vec = vector()
+for (part in stations_json){
+  for (k in 1:length(part$stations)){
+    station_vec = c(station_vec, part$stations[k])
+    latitudes_vec = c(latitudes_vec, part$latitudes[k])
+    longitudes_vec = c(longitudes_vec, part$longitudes[k])}}
+
+station_frame = data.frame(station_vec, latitudes_vec, longitudes_vec)
+```
+
+<div dir="auto">
+فایل جیسون را میخوانم. و یک دیتافریم از روی آن میسازم که شامل سه ستون طول و عرض ایستگاه ها و نام آنها است.
+</div>
+
+```{r}
+library(geosphere)
+walkability = vector()
+list_lat1 = input[, 12]
+list_lon1 = input[, 13]
+list_lat2 = station_frame[, 2]
+list_lon2 = station_frame[, 3]
+```
+
+
+
+```{r}
+for (house in 1:length(list_lat1)){
+  lat1 = list_lat1[house]
+  lon1 = list_lon1[house]
+  distance = distm(c(lon1, lat1), cbind(list_lon2, list_lat2), fun = distHaversine)
+  min_dist = min(distance)
+  walkability = c(walkability, min_dist)
+}
+```
+
+```{r}
+input[, 15] = walkability
+names(input)[15] = "walkability"
+```
+
+<div dir="auto">
+در سه cell بالا قصد دارم یک ستون به دیتافریم اضافه کنم که نشان دهنده فاصله تا نزدیک ترین ایستگاه مترو است.
+</div>
+
+```{r}
+ppm = vector()
+for(p in 1:length(input$price)){
+  ppm = c(ppm, input[p, 9] / input[p, 5])
+}
+input[, 16] = ppm
+names(input)[16] = "ppm"
+```
+
+<div dir="auto">
+در این cell هم یک ستون دیگر اضافه میکنم که نشان دهنده ی این است که هر خانه متری چند است. (price per meter)
+</div>
+
+
+
+```{r}
+surface_room_reg = lm(input$rooms_count ~ input$surface_housing)
+summary(surface_room_reg)
+```
+<div dir="auto">
+در این cell رابطه بین تعداد اتاق ها و مساحت خانه را بررسی میکنم که چون R squared به یک نزدیک هست میتوان فهمید که این دو ستون رابطه ی خطی دارند.
+</div>
+
+#part B
+
+```{r}
+maison_rooms = vector()
+apartmant_rooms = vector()
+for(c in 1:length(input$type_property)){
+  if(input[c, 3] == "maison"){
+    maison_rooms = c(maison_rooms, input[c, 4])
+  }else{
+    apartmant_rooms = c(apartmant_rooms, input[c, 4])
+  }
+}
+t.test(maison_rooms, apartmant_rooms)
+```
+
+```{r}
+library(patchwork)
+(ggplot() + geom_histogram(aes(x=apartmant_rooms, y=..count../sum(..count..)))) + 
+(ggplot() + geom_histogram(aes(x=maison_rooms, y=..count../sum(..count..))))
+```
+<div dir="auto">
+در قسمت بالا تعداد اتاق های خانه و آپارتمان را مقایسه میکنم. فرض صفر را عدم تفاوت تعداد خانه ها گرفتم که از نتیجه t test و مقدار p value میتوان فهمید فرض عدم تفاوت را رد کرد و نتیجه گرفت که تعداد اتاق های خانه و اپارتمان متفاوت هست که از روی نمودار هم این نتیجه مشهود است که خانه ها به طور متوسط تعداد اتاق های بیشتری نسبت به آپارتمان ها دارند.
+</div>
+
+```{r}
+library("gplots")
+library("reshape2")
+library("data.table")
+
+h <- input[, c('rooms_count', 'type_property')]
+
+frequency = dcast(as.data.table(h), rooms_count ~ type_property)
+
+dt = as.table(as.matrix(frequency))
+balloonplot(t(dt), main = "housetasks", xlab = "type_property", ylab = "rooms_count", label = TRUE, show.margins = FALSE)
+
+
+```
+<div dir="auto">
+در ادامه توضیحات بالا مربوط به تعداد اتاق در این نمودار هم تعداد آپارتمان ها و خانه ها را بر اساس تعداد خواب میتوان مشاهده کرد.
+</div>
+
+
+```{r}
+surface_room_reg = lm(data=input, surface_housing~rooms_count)
+surface_room_yhat = predict(surface_room_reg, input)
+summary(surface_room_reg)
+```
+
+<div dir="auto">
+در این قسمت رابطه تعداد اتاث با مساحت را بررسی میکنم. با توجه به مقادیر کم p value اگر فرض صفر را مستقل بودن در نظر بگیریم این فرض رد می شود و در نتیجه وابسته هستند. و همچنین R squared نزدیک به 1 است که باز هم مرتبط بودن را نشان میدهد. پس رابطه ای خطی بین تعداد اتاق و مساحت خانه ها برقرار است.
+</div>
+
+```{r}
+ggplot() + geom_boxplot(data=input, aes(input$rooms_count, input$surface_housing, group=input$rooms_count) , main="room vs surface") + geom_line(data=input, aes(input$rooms_count, surface_room_yhat), color="blue")
+```
+
+<div dir="auto">
+خط رگرسیون در این قسمت نیز نشان دهنده این رابطه ی خطی است و تقریبا به جز یک سری داده پرت ساندویچ شده است و روی میانه هست و بین چارک اول و دوم قرار دارد.
+</div>
+
+
+```{r}
+library(patchwork)
+
+(ggplot() + ggtitle("ppm") + 
+  geom_point(data=input, aes(y=latitude, x=longitude, color=ppm), show.legend = FALSE) +
+  scale_color_gradient2(low = "blue", midpoint = sqrt(var(ppm)) * 0 + mean(ppm), high = "red", limits=c(sqrt(var(ppm)) * (-5) + mean(ppm) , sqrt(var(ppm)) * 5 + mean(input$ppm))) +
+  theme(panel.background = element_rect(fill = "dimgray"))) + 
+(ggplot() + ggtitle("walkability") +
+geom_point(data=input, aes(y=input$latitude, x=input$longitude, color=input$walkability), show.legend = FALSE) +
+  scale_color_gradient2(low = "blue", midpoint = 550, high = "red") +
+  theme(panel.background = element_rect(fill = "dimgray")))
+```
+
+<div dir="auto">
+در این قسمت دو نمودار مسافت بین خانه تا نزدیک ترین مترو و قیمت خانه را در کنار هم نشان داده ام که میتوان دید در مرکز شهر که پیاده روی کمی تا مترو هست قیمت خانه ها بالا است و در سمت چپ و حومه شهر که پیاده روی زیاد است قیمت خانه ها کمتر میشود. و تقریبا رابطه ی معکوسی بین آنها برقرار است.
+</div>
+
+```{r}
+price_over_time = aggregate(input[, 16], list(substr(as.character(input$date_transaction), 1, 4)), mean)
+reg_price_over_time = lm(data=price_over_time, price_over_time$x ~ order(price_over_time$Group.1))
+summary(reg_price_over_time)
+price_over_time_yhat = predict(reg_price_over_time, price_over_time)
+ggplot() + geom_line(aes(x=order(price_over_time$Group.1), y=price_over_time$x)) + geom_line(data=price_over_time, aes(order(price_over_time$Group.1), price_over_time_yhat), color="blue")
+```
+
+<div dir="auto">
+در این نمودار میانگین قیمت خانه ها را ر طی سال های متوالی نشان داده ام. هم از روی نمودار و هم با توجه به r squared مشخص است که میانگین قیمت در طی سال های متوالی رشد داشته است و زمان و قیمت رابطه ی خطی دارند.
+</div>
+
+
+#part c
+
+```{r}
+desired_houses = copy(input)
+```
+
+
+<div dir="auto">
+یک کپی از دیتای اصلی میگیرم که تغییرات لازم را روی آن انجام دهم.
+</div>
+
+
+```{r}
+dist_to_uni = vector()
+for (house in 1:length(desired_houses$price)){
+  lat1 = desired_houses[house, 12]
+  lon1 = desired_houses[house, 13]
+  lat2 = 45.780234113880425
+  lon2 = 4.865561717882041
+  dist = distm(c(lon1, lat1), cbind(lon2, lat2), fun = distHaversine)
+  dist_to_uni = c(dist_to_uni, dist)
+}
+```
+
+
+<div dir="auto">
+در این بخش فاصله تا دانشگاه را برای هر خانه حساب میکنم و یک ستون جدید اضافه میکنم.
+</div>
+
+
+```{r}
+desired_houses[, 17] = dist_to_uni
+names(desired_houses)[17] = "dist_to_uni"
+```
+
+
+```{r}
+desired_houses_copy = copy(desired_houses)
+```
+
+
+```{r}
+delOutstylingHouses <- function(u_dist, m_dist, p_value, s_area, desired_houses_copy){
+  
+  rs = which(desired_houses_copy$dist_to_uni > u_dist)
+  desired_houses_copy = desired_houses_copy[-c(rs), ]
+
+  rs = which(desired_houses_copy$walkability > m_dist)
+  desired_houses_copy = desired_houses_copy[-c(rs), ]
+
+  rs = which(desired_houses_copy$price > p_value)
+  desired_houses_copy = desired_houses_copy[-c(rs), ]
+
+  rs = which(desired_houses_copy$surface_housing < s_area)
+  desired_houses_copy = desired_houses_copy[-c(rs), ]
+  
+  return(desired_houses_copy)
+}
+```
+
+
+<div dir="auto">
+در این قسمت یک تابع دارم که مقادیر نامطلوب را حذف میکند. خانه های با قیمت بیشتر از یک حد حذف می شوند. خانه های با فاصله از حدی بیشتر از مترو یا دانشگاه حذف می شوند و خانه های با مساحت کمتر از یک مقدار نیز حذف می شوند. و یک سری خانه مطلوب تر به دست می آید.
+</div>
+
+```{r}
+desired_houses_copy = delOutstylingHouses(4000, 500, 150000, 50, desired_houses_copy)
+```
+
+
+```{r}
+desired_houses_copy$price = desired_houses_copy$price / mean(desired_houses_copy$price)
+desired_houses_copy$dist_to_uni = desired_houses_copy$dist_to_uni / mean(desired_houses_copy$dist_to_uni)
+desired_houses_copy$surface_housing = desired_houses_copy$surface_housing / mean(desired_houses_copy$surface_housing)
+desired_houses_copy$walkability = desired_houses_copy$walkability / mean(desired_houses_copy$walkability)
+```
+
+
+<div dir="auto">
+در این بخش مقادیری که میخواهم با یک ضریب با هم مقایسه کنم را به میانگین آنها تقسیم میکنم تا مقایسه بهتری انجام شود.
+</div>
+
+```{r}
+L1 = 1.5
+L2 = 1
+L3 = 0.8
+L4 = 1.5
+desired_houses_copy$target = L1 * desired_houses_copy$price +
+                              L2 * desired_houses_copy$dist_to_uni +
+                              L3 * desired_houses_copy$surface_housing +
+                              L4 * desired_houses_copy$walkability
+```
+
+
+
+<div dir="auto">
+به هر ویژگی با توجه به اینکه چقدر مهم است یک ضریب میدهم و با هم جمع میکنم. از انجا که اگر خانه نزدیک مترو باشد فاصله تا دانشگاه چندان مهم نیست پس ضریب فاصله تا مترو را بیشتر می دهم و همچنین قیمت را ضریب کمتری می دهم.
+</div>
+
+```{r}
+ggplot() + geom_point( data=desired_houses_copy, aes(y=latitude, x=longitude, color = target), size = 0.4) + geom_point(aes(y=45.780234113880425, x=4.865561717882041), size=2) + geom_point(data=desired_houses, aes(y=latitude, x=longitude), size = 0.2, color = "yellow")
+```
+
+<div dir="auto">
+نمودار بالا ایجاد می شود که نشان دهنده مطلوبیت هر خانه است.
+</div>
+
+```{r}
+desired_houses_co = desired_houses_copy[order(desired_houses_copy$target),]
+```
+
+```{r, render = lemon_print}
+df = head(desired_houses_co)
+```
+```{r}
+ggplot() + geom_point( data=df, aes(y=latitude, x=longitude), color = "red", size = 1, show.legend = FALSE) + geom_point(aes(y=45.780234113880425, x=4.865561717882041), size=2) + geom_point(data=desired_houses, aes(y=latitude, x=longitude), size = 0.2, color = "green")
+```
+
+
+
+
+<div dir="auto">
+در نهایت بر اساس ستون اضافه شده سورت میکنم و چند خانه مینیمم را جدا میکنم. در نهایت دقت شود که این خانه ها ممکن است به فروش رفته باشند و منظور این است که محدوده اطراف خانه مطلوب است و در آنجا میتوان دنبال خانه گشت.
+</div>
