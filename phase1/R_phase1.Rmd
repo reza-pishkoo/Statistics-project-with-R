@@ -1,0 +1,376 @@
+---
+title: "R_phase1"
+author: "Reza Pishkoo"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#question1
+#part a)i
+```{r}
+success <- 0:50
+
+plot(success, dpois(success, lambda=5),
+     type='h',
+     main='Poisson Distribution (lambda = 5)',
+     ylab='Probability',
+     xlab ='# Successes',
+     lwd=3)
+```
+#part a)ii
+```{r}
+x <- 1:10
+smp_array1 = vector()
+for (val in x) {
+smp = rpois(50, lambda = 5)
+mean_smp = mean(smp)
+smp_array1 = c(smp_array1, mean_smp)
+}
+hist(smp_array1) 
+```
+
+#to show the histogram of the means of 100 sample
+```{r}
+x <- 1:100
+smp_array2 = vector()
+for (val in x) {
+smp = rpois(50, lambda = 5)
+mean_smp = mean(smp)
+smp_array2 = c(smp_array2, mean_smp)
+}
+hist(smp_array2) 
+```
+
+#to show the histogram of the means of 1000 sample
+```{r}
+x <- 1:1000
+smp_array3 = vector()
+for (val in x) {
+smp = rpois(50, lambda = 5)
+mean_smp = mean(smp)
+smp_array3 = c(smp_array3, mean_smp)
+}
+hist(smp_array3) 
+```
+
+#part a)iii
+```{r}
+mean_val1 = mean(smp_array1)
+var_val1 = var(smp_array1)
+cat("means of means for 10 sample : ",mean_val1, "\n")
+cat("var of means for 10 sample : ", var_val1, "\n")
+```
+
+```{r}
+mean_val2 = mean(smp_array2)
+var_val2 = var(smp_array2)
+cat("means of means for 100 sample : ",mean_val2, "\n")
+cat("var of means for 100 sample : ", var_val2, "\n")
+```
+
+```{r}
+mean_val3 = mean(smp_array3)
+var_val3 = var(smp_array3)
+cat("means of means for 1000 sample : ",mean_val3, "\n")
+cat("var of means for 1000 sample : ", var_val3, "\n")
+```
+
+
+```{r}
+normalized_array1 = smp_array1 - mean_val1
+normalized_array1 = normalized_array1 / sqrt(var_val1)
+hist(normalized_array1, prob=TRUE)
+x <- seq(min(normalized_array1), max(normalized_array1), length=1000)
+normal1 = dnorm(x)
+lines(x, normal1)
+```
+
+```{r}
+normalized_array2 = smp_array2 - mean_val2
+normalized_array2 = normalized_array2 / sqrt(var_val2)
+hist(normalized_array2, prob=TRUE, ylim=c(0, 0.6))
+x <- seq(min(normalized_array2), max(normalized_array2), length=1000)
+normal2 = dnorm(x)
+lines(x, normal2)
+```
+
+```{r}
+normalized_array3 = smp_array3 - mean_val3
+normalized_array3 = normalized_array3 / sqrt(var_val3)
+hist(normalized_array3, prob=TRUE)
+x <- seq(min(normalized_array3), max(normalized_array3), length=1000)
+normal3 = dnorm(x)
+lines(x, normal3)
+```
+مشاهده می شود که برای تعداد نمونه های بزرگ مانند 1000 تا به توزیع نرمال همگرا می شود که نشان دهنده درستی قضیه حد مرکزی است.
+
+#part b)i
+```{r}
+library(fastR2)
+
+birth_frame=group_by(Births,day_of_year)
+birth_frame=summarise(birth_frame,day_mean=mean(births))
+min = birth_frame[which.min(birth_frame$day_mean),]
+max = birth_frame[which.max(birth_frame$day_mean),]
+min[[1]]
+max[[1]]
+```
+
+#part b)ii
+```{r}
+birth_month=group_by(Births,month)
+birth_month=summarize(birth_month,month_mean=mean(births))
+sorted_mean=arrange(birth_month,desc(month_mean))
+print(birth_month)
+print(sorted_mean)
+```
+#part c
+```{r}
+library(dplyr)
+
+st = mutate(storms,new_time=storms$year*24*366+storms$month*30*24+storms$day*24+storms$hour)
+
+sorted_storms=storms[order(st$new_time),]
+
+write.csv(sorted_storms[-ncol(sorted_storms)],"storms_report.csv")
+
+sorted_storms$status=as.factor(sorted_storms$status)
+
+ggplot() +geom_point( data=sorted_storms, aes(x=long, y=lat , color = as.factor(status)), size = 0.4)
+```
+
+
+
+#question2
+#part a)i
+```{r}
+# Read TAB delimited files
+had_dataframe = read.delim("had.txt", header = FALSE)
+had_dataframe = data.frame(had_dataframe)
+colnames(had_dataframe) = c("age", "sex", "pain", "blood", "cholesterol", "sugar", "heart_attack")
+```
+#part a)ii
+```{r}
+label = had_dataframe[7]
+features = had_dataframe[-7]
+```
+#part a)iii
+```{r}
+num_data = nrow(label)
+x = (80 * num_data) / 100
+x = as.integer(x)
+y = 1:num_data
+rand_sample =sample(y, x)
+
+train_label = label[rand_sample, ]
+train_label = data.frame(train_label)
+train_feature = features[rand_sample, ]
+
+test_label = label[-rand_sample, ]
+test_label = data.frame(test_label)
+test_feature = features[-rand_sample, ]
+
+write.table(train_feature, "train_feature.txt", row.names = FALSE, col.names = FALSE)
+write.table(train_label, "train_label.txt", row.names = FALSE, col.names = FALSE)
+write.table(test_feature, "test_feature.txt", row.names = FALSE, col.names = FALSE)
+write.table(test_label, "test_label.txt", row.names = FALSE, col.names = FALSE)
+```
+
+#part b)i
+```{r}
+train_reg = lm(train_label$train_label ~ train_feature$age + train_feature$sex + train_feature$pain + train_feature$blood + train_feature$cholesterol + train_feature$sugar)
+
+summary(train_reg)
+```
+<div dir="auto">
+در قسمت call فرمولی نشان داده می شود که از آن برای حساب کردن رگرسیون استفاده کرده ایم.
+
+در قسمت Residulas اختلاف مقادیر حقیقی و مقادیر پیشبینی شده نشان داده شده است.
+
+در قسمت Estimate ضرایب به دست آمده از کمترین مجموع مربعات است.
+
+در قسمت Std. Error انحراف معیار ضرایب نشان داده میشود.
+
+در قسمت t value تقسیم ضریب و std error نمایش داده می شود که هر چه از صفر دور تر باشد یعنی ضرایب ما دقیق تر هستند.
+
+در ستون آخر مقدار p value نشان داده می شود که به ما کمک میکند تا بفهمیم ضریب ما چقدر برای مدل معنا دار است. در عمل p value کمتر از 0.05 را معنی دار در نظر میگیریم.
+
+در قسمت signif. codes راهی سری به ما داده می شود که بفهمیم کدام ضرایب برای مدل ما مهم هستند. تعداد ستاره ها با اهمیت ضریب مطابقت دارد. هر چه تعداد ستاره بیشتر باشد اهمیت بیشتری دارد.
+
+قسمت Residual standard error معیاری است که نشان دهد مدل چقدر با داده تطابق دارد. در واقع میانگین تفاوت های مقادیر حقیقی با مقادیر پیشبینی شده را به ما می دهد.
+
+
+</div>
+
+#part b)ii
+
+<div dir="auto">
+
+از لحاظ قدر مطلقی بیشترین مقدار مربوط به جنسیت و کمترین مقدار مربوط به میزان کلسترول است اما این مقایسه صحیح نیست زیرا متغیر ها در یک رنج نیستند برای مثال بین همین دو متغیر، جنسیت در بازه ی 0و 1 تغییر میکند در حال که میزان کلسترول بین 100 تا 600 متغیر است.
+
+برای مقایسه پذیر شدن این ضرایب اول باید آنها را نرمال کنیم تا بازه تغییر آنها یکسان شود و در این حالت مقایسه ای که انجام می دهیم صحیح تر است.
+
+</div>
+
+
+#part c)i
+
+```{r}
+library(data.table)
+facts = train_reg$coefficients
+calculate <- function(limit){
+  result = copy(test_label)
+  for (i in 1:nrow(test_feature)){
+    vals = test_feature[i,]
+    res = sum(vals*facts[-1]) + facts[1]
+    if(res > limit){
+      result[i,] = 1
+    }
+    if(res < limit){
+      result[i,] = -1
+    }
+  }
+  return(sum(result$test_label == test_label$test_label)/nrow(test_label))
+}
+
+calculate(0)
+
+```
+#part c)ii
+```{r}
+sequ = seq(-2, 2, 0.1)
+vect = vector()
+for (x in sequ){
+  vect = c(vect, calculate(x))
+}
+rate_frame = data.frame(x=sequ, y=vect)
+maximum_limit = rate_frame[which.max(rate_frame$y), ]
+print(maximum_limit[[1]])
+plot(sequ, vect)
+
+```
+
+#quesion3
+#part a)i
+```{r}
+library(readxl)
+library(dplyr)
+
+input = read_excel("input.xlsx", sheet=3)
+
+input_prim = input[-1,]
+input_prim = input_prim[-1,]
+input_prim = input_prim[,-1]
+
+to_del = vector()
+num_deleted_clm = 0
+for (col in 1:ncol(input_prim)) {
+  x = length(lapply(input_prim[, col], as.numeric)[input_prim[,col]<10])
+  print(x)
+  if (x > 7){
+    to_del = c(to_del, col)
+  }
+}
+
+```
+
+#part a)ii
+```{r}
+library(readxl)
+for (x in to_del){
+  input = input[,-(x-num_deleted_clm + 1)]
+  num_deleted_clm = num_deleted_clm + 1
+}
+
+
+input2 = input[-1,]
+input2 = input2[-1,]
+input2 = input2[,-1]
+input2 = as.data.frame(sapply(input2, as.numeric))
+View(input2)
+
+tmp = na_if(input2, 0)
+write.csv(tmp, file="cleared_data.csv")
+```
+
+
+#part b)i
+```{r}
+library(ggplot2)
+my_row = tmp[14, ]
+time_vector = c(1:ncol(my_row))
+time_vector = rev(time_vector)
+combined = rbind(my_row, time_vector)
+rownames(combined) = c("price", "time")
+combined <- t(combined)
+combined = data.frame(combined)
+reg = lm(data=combined, price ~ time)
+
+print(summary(reg)$coefficient)
+print(summary(reg)$sigma)
+
+
+plot(y=combined$price, x=combined$time)
+abline(reg, col="blue")
+```
+
+#part b)ii
+```{r}
+price = vector()
+time = vector()
+region = vector()
+
+tmp = t(tmp)
+tmp = t(tmp)
+t = c(1:ncol(tmp))
+t = rev(t)
+  
+for (i in 1:39){
+  price = c(price, tmp[, i])
+  time = c(time, rep(i, 23))
+  region = c(region, seq(1, 23))
+}
+ptr_combined = data.frame(region, time, price)
+reg = lm(data=ptr_combined, price ~ time + region)
+
+print(summary(reg))
+```
+
+#part b)iii
+```{r}
+indicator_mat = matrix(0, nrow(ptr_combined), 22)
+for (i in seq(1:nrow(ptr_combined))){
+  if (i%%23 < 14){
+    indicator_mat[i, i%%23] = 1
+  }
+  if (i%%23 > 14){
+    indicator_mat[i, (i-1)%%23] = 1
+  }
+  if(i%%23 == 0){
+    indicator_mat[i, 22] = 1
+  }
+}
+ptr_combined = data.frame(indicator_mat, time, price)
+reg = lm(data=ptr_combined, price ~ .)
+
+print(summary(reg))
+```
+
+#part b)iv
+<div dir="auto">
+
+روش دوم بهتر است زیرا که انحراف معیار کمتری دارد. چون در این حالت هر منطفه را جدا در نظر گرفتیم و ضریب خودش را دارد و با توجه به جاهای مختلف شهر تخمین بهتری میتوان زد.
+
+</div>
+
+
+
+
+
+
+
+
+
